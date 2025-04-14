@@ -8,6 +8,7 @@ import MapViewDirections from 'react-native-maps-directions';
 import {GOOGLE_MAPS_KEY} from '@env'
 import ContadorVelocidad from './componets/ContadorVelocidad';
 
+
 export default function App() {
 
   const [origin, setOrigin] = React.useState(
