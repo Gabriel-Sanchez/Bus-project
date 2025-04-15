@@ -1,3 +1,6 @@
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import LoginScreen from './LoginScreen';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import { StyleSheet, Text, View } from 'react-native';
@@ -8,9 +11,9 @@ import MapViewDirections from 'react-native-maps-directions';
 import {GOOGLE_MAPS_KEY} from '@env'
 import ContadorVelocidad from './componets/ContadorVelocidad';
 
+const Stack = createNativeStackNavigator();
 
-export default function App() {
-
+function HomeScreen() {
   const [origin, setOrigin] = React.useState(
     {
       latitude: 33.640411,
@@ -32,6 +35,7 @@ export default function App() {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted' ){
       alert('permission denied')
+      return;
     }
     let location = await Location.getCurrentPositionAsync({})
     const current = {
@@ -39,7 +43,6 @@ export default function App() {
       longitude: location.coords.longitude
     }
     setOrigin(current)
-
   }
 
  
@@ -77,6 +80,29 @@ export default function App() {
       <ContadorVelocidad />
 
     </View>
+  );
+}
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen 
+          name="Login" 
+          component={LoginScreen} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Home" 
+          component={HomeScreen}
+          options={{ 
+            headerShown: true,
+            title: 'Mapa',
+            headerBackVisible: false
+          }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
 
