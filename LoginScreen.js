@@ -22,7 +22,6 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      // Aquí deberías reemplazar esta URL con tu API real
       const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/login/', {
         method: 'POST',
         headers: {
@@ -35,14 +34,19 @@ export default function LoginScreen({ navigation }) {
       });
 
       const data = await response.json();
+      console.log('Respuesta del login:', data); // Log para debug
 
-      if (response.ok) {
-        // Si el login es exitoso, navega a la pantalla principal
-        navigation.replace('Home');
+      if (response.ok && data.token) {
+        // Navegar a la pantalla de lista de datos con el token y username
+        navigation.replace('DataList', {
+          token: data.token,
+          username: username
+        });
       } else {
         Alert.alert('Error', data.message || 'Error al iniciar sesión');
       }
     } catch (error) {
+      console.error('Error completo:', error);
       Alert.alert('Error', 'Error de conexión');
     } finally {
       setLoading(false);

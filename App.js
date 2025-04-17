@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from './LoginScreen';
+import DataListScreen from './DataListScreen';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
 import { StyleSheet, Text, View } from 'react-native';
@@ -93,12 +94,19 @@ export default function App() {
           options={{ headerShown: false }}
         />
         <Stack.Screen 
+          name="DataList" 
+          component={DataListScreen}
+          options={{ 
+            title: 'Mis Datos',
+            headerBackVisible: false
+          }}
+        />
+        <Stack.Screen 
           name="Home" 
           component={HomeScreen}
           options={{ 
             headerShown: true,
-            title: 'Mapa',
-            headerBackVisible: false
+            title: 'Mapa'
           }}
         />
       </Stack.Navigator>
