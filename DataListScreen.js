@@ -16,15 +16,8 @@ export default function DataListScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const { username, token } = route.params;
 
-  console.log('Token recibido en DataList:', route.params.token);
-
   const fetchData = async () => {
     try {
-      console.log('Headers de la petición:', {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      });
-
       const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/data/', {
         method: 'GET',
         headers: {
@@ -97,22 +90,52 @@ export default function DataListScreen({ route, navigation }) {
     );
   };
 
-  const renderItem = ({ item }) => (
-    <View style={styles.itemContainer}>
-      {Object.entries(item).map(([key, value]) => (
-        <View key={key} style={styles.itemRow}>
-          <Text style={styles.itemKey}>{key}:</Text>
-          <Text style={styles.itemValue}>
-            {typeof value === 'object' ? JSON.stringify(value) : value.toString()}
+  const handleRoutePress = (route) => {
+    navigation.navigate('Home', {
+      destination: route.end_location,
+      routeInfo: {
+        title: route.title,
+        description: route.description,
+        schedule: route.schedule
+      }
+    });
+  };
+
+  const renderRouteCard = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.routeCard}
+      onPress={() => handleRoutePress(item)}
+    >
+      <View style={styles.routeHeader}>
+        <Text style={styles.routeTitle}>{item.title}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: item.status === 'active' ? '#4CAF50' : '#FFA000' }]}>
+          <Text style={styles.statusText}>{item.status === 'active' ? 'Activa' : 'Inactiva'}</Text>
+        </View>
+      </View>
+      
+      <Text style={styles.routeDescription}>{item.description}</Text>
+      
+      <View style={styles.routeDetails}>
+        <Text style={styles.scheduleText}>🕒 {item.schedule}</Text>
+        
+        <View style={styles.locationContainer}>
+          <Text style={styles.locationText}>
+            📍 Inicio: {item.start_location.name}
+          </Text>
+          <Text style={styles.locationText}>
+            🏁 Fin: {item.end_location.name}
           </Text>
         </View>
-      ))}
-    </View>
-  );
+      </View>
 
-  const goToMap = () => {
-    navigation.navigate('Home');
-  };
+      <View style={styles.cardFooter}>
+        <Text style={styles.driverText}>
+          👤 {item.is_driver ? 'Conductor' : 'Pasajero'}: {item.user}
+        </Text>
+        <Text style={styles.viewMapText}>Ver en mapa →</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   if (loading) {
     return (
@@ -128,26 +151,22 @@ export default function DataListScreen({ route, navigation }) {
         <View style={styles.headerLeft}>
           <Text style={styles.welcomeText}>Bienvenido, {username}</Text>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.mapButton} onPress={goToMap}>
-            <Text style={styles.mapButtonText}>Ver Mapa</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
         data={data}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+        renderItem={renderRouteCard}
+        keyExtractor={(item) => item.id.toString()}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No hay datos disponibles</Text>
+            <Text style={styles.emptyText}>No hay rutas disponibles</Text>
           </View>
         }
       />
@@ -177,24 +196,10 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
-  headerRight: {
-    flexDirection: 'row',
-    gap: 10,
-  },
   welcomeText: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-  },
-  mapButton: {
-    backgroundColor: '#007AFF',
-    padding: 8,
-    borderRadius: 5,
-  },
-  mapButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
   },
   logoutButton: {
     backgroundColor: '#FF3B30',
@@ -206,36 +211,84 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  itemContainer: {
+  listContainer: {
+    padding: 10,
+  },
+  routeCard: {
     backgroundColor: '#fff',
-    padding: 15,
-    marginHorizontal: 10,
-    marginVertical: 5,
-    borderRadius: 8,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 2,
     },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  itemRow: {
+  routeHeader: {
     flexDirection: 'row',
-    marginBottom: 5,
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  itemKey: {
-    fontSize: 14,
+  routeTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginRight: 5,
+    flex: 1,
   },
-  itemValue: {
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  routeDescription: {
     fontSize: 14,
     color: '#666',
-    flex: 1,
+    marginBottom: 12,
+  },
+  routeDetails: {
+    marginTop: 8,
+  },
+  scheduleText: {
+    fontSize: 14,
+    color: '#444',
+    marginBottom: 8,
+  },
+  locationContainer: {
+    marginTop: 4,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#444',
+    marginBottom: 4,
+  },
+  cardFooter: {
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 12,
+  },
+  driverText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  viewMapText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
