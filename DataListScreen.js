@@ -9,46 +9,41 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function DataListScreen({ route, navigation }) {
+const DataListScreen = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedRoute, setSelectedRoute] = useState(null);
+  const [attendanceChanges, setAttendanceChanges] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const { username, token } = route.params;
-
-  const fetchData = async () => {
-    try {
-      const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/data/', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const jsonData = await response.json();
-        console.log('Datos recibidos:', JSON.stringify(jsonData, null, 2));
-        setData(jsonData);
-      } else {
-        const errorText = await response.text();
-        console.error('Error fetching data:', errorText);
-      }
-    } catch (error) {
-      console.error('Network error:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const [user, setUser] = useState(null);
+  const navigation = useNavigation();
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    const checkAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        const userData = await AsyncStorage.getItem('user');
+        
+        if (!token || !userData) {
+          navigation.replace('Login');
+          return;
+        }
+        
+        setUser(JSON.parse(userData));
+        fetchData(token);
+      } catch (err) {
+        console.error('Error checking auth:', err);
+        navigation.replace('Login');
+      }
+    };
 
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    fetchData();
+    checkAuth();
   }, []);
 
   const handleLogout = async () => {
@@ -64,24 +59,11 @@ export default function DataListScreen({ route, navigation }) {
           text: 'Sí, cerrar sesión',
           onPress: async () => {
             try {
-              const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/logout/', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-              });
-              
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              });
+              await AsyncStorage.removeItem('token');
+              await AsyncStorage.removeItem('user');
+              navigation.replace('Login');
             } catch (error) {
-              console.error('Error en logout:', error);
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              });
+              console.error('Error al cerrar sesión:', error);
             }
           },
           style: 'destructive'
@@ -90,50 +72,226 @@ export default function DataListScreen({ route, navigation }) {
     );
   };
 
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        await fetchData(token);
+      }
+    } catch (err) {
+      console.error('Error al recargar:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  const fetchData = async (token) => {
+    try {
+      const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/data/', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al obtener los datos');
+      }
+
+      const result = await response.json();
+      
+      // Mantener los cambios de asistencia existentes
+      if (selectedRoute) {
+        const updatedResult = result.map(route => {
+          if (route.id === selectedRoute.id) {
+            return {
+              ...route,
+              students: route.students.map(student => {
+                const existingChange = attendanceChanges[student.id];
+                if (existingChange) {
+                  return {
+                    ...student,
+                    attendance_status: existingChange.status
+                  };
+                }
+                return student;
+              })
+            };
+          }
+          return route;
+        });
+        setData(updatedResult);
+      } else {
+        setData(result);
+      }
+    } catch (err) {
+      setError(err.message);
+      Alert.alert('Error', 'No se pudieron cargar los datos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRoutePress = (route) => {
+    navigation.navigate('StudentsList', { route });
+  };
+
+  const handleMapPress = (route) => {
     navigation.navigate('Home', {
-      destination: route.end_location,
+      destination: {
+        latitude: route.end_location.latitude,
+        longitude: route.end_location.longitude,
+      },
       routeInfo: {
         title: route.title,
         description: route.description,
-        schedule: route.schedule
+        schedule: route.schedule,
       }
     });
   };
 
+  const saveAttendanceChanges = async () => {
+    if (Object.keys(attendanceChanges).length === 0) {
+      Alert.alert('Información', 'No hay cambios para guardar');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        navigation.navigate('Login');
+        return;
+      }
+
+      const response = await fetch('http://192.168.1.2:8000/api/update-attendance/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          changes: attendanceChanges
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al guardar los cambios');
+      }
+
+      // Limpiar los cambios guardados
+      setAttendanceChanges({});
+      Alert.alert('Éxito', 'Los cambios se han guardado correctamente');
+    } catch (err) {
+      Alert.alert('Error', 'No se pudieron guardar los cambios');
+      console.error('Error saving attendance:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAttendancePress = (student, currentStatus) => {
+    const newStatus = currentStatus === 'pending' ? 'present' : 
+                     currentStatus === 'present' ? 'absent' : 'pending';
+    
+    // Actualizar el estado local
+    setSelectedRoute(prevRoute => ({
+      ...prevRoute,
+      students: prevRoute.students.map(s => 
+        s.id === student.id ? { ...s, attendance_status: newStatus } : s
+      )
+    }));
+
+    // Guardar el cambio para enviar a la API
+    setAttendanceChanges(prev => ({
+      ...prev,
+      [student.id]: {
+        status: newStatus,
+        route_id: selectedRoute.id,
+        timestamp: new Date().toISOString()
+      }
+    }));
+  };
+
+  const getAttendanceIcon = (status) => {
+    switch (status) {
+      case 'present':
+        return '✅';
+      case 'absent':
+        return '❌';
+      default:
+        return '🟡';
+    }
+  };
+
+  const renderStudentItem = ({ item }) => (
+    <View style={styles.studentItem}>
+      <View style={styles.studentInfo}>
+        <Text style={styles.studentName}>
+          {item.first_name} {item.last_name}
+        </Text>
+        <Text style={styles.studentDetails}>
+          {item.group?.name} • {item.pickup_time}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={[
+          styles.attendanceButton,
+          attendanceChanges[item.id] && styles.changedAttendanceButton
+        ]}
+        onPress={() => handleAttendancePress(item, item.attendance_status || 'pending')}
+      >
+        <Text style={styles.attendanceText}>
+          {getAttendanceIcon(item.attendance_status || 'pending')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderRouteCard = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.routeCard}
+    <TouchableOpacity
+      style={[
+        styles.routeCard,
+        selectedRoute?.id === item.id && styles.selectedRouteCard
+      ]}
       onPress={() => handleRoutePress(item)}
     >
       <View style={styles.routeHeader}>
         <Text style={styles.routeTitle}>{item.title}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: item.status === 'active' ? '#4CAF50' : '#FFA000' }]}>
-          <Text style={styles.statusText}>{item.status === 'active' ? 'Activa' : 'Inactiva'}</Text>
+        <View style={[
+          styles.statusBadge,
+          { backgroundColor: item.status === 'active' ? '#4CAF50' : '#FF5252' }
+        ]}>
+          <Text style={styles.statusText}>
+            {item.status === 'active' ? 'Activa' : 'Inactiva'}
+          </Text>
         </View>
       </View>
       
       <Text style={styles.routeDescription}>{item.description}</Text>
       
       <View style={styles.routeDetails}>
-        <Text style={styles.scheduleText}>🕒 {item.schedule}</Text>
+        <View style={styles.detailItem}>
+          <Ionicons name="time-outline" size={16} color="#666" />
+          <Text style={styles.detailText}>{item.schedule}</Text>
+        </View>
         
-        <View style={styles.locationContainer}>
-          <Text style={styles.locationText}>
-            📍 Inicio: {item.start_location.name}
-          </Text>
-          <Text style={styles.locationText}>
-            🏁 Fin: {item.end_location.name}
+        <View style={styles.detailItem}>
+          <Ionicons name="location-outline" size={16} color="#666" />
+          <Text style={styles.detailText}>
+            {item.start_location.name} → {item.end_location.name}
           </Text>
         </View>
       </View>
 
-      <View style={styles.cardFooter}>
-        <Text style={styles.driverText}>
-          👤 {item.is_driver ? 'Conductor' : 'Pasajero'}: {item.user}
-        </Text>
-        <Text style={styles.viewMapText}>Ver en mapa →</Text>
-      </View>
+      <TouchableOpacity
+        style={styles.mapButton}
+        onPress={() => handleMapPress(item)}
+      >
+        <Ionicons name="map-outline" size={20} color="#007AFF" />
+        <Text style={styles.mapButtonText}>Ver en mapa</Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -145,11 +303,24 @@ export default function DataListScreen({ route, navigation }) {
     );
   }
 
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => fetchData(user.token)}>
+          <Text style={styles.retryButtonText}>Reintentar</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.welcomeText}>Bienvenido, {username}</Text>
+          <Text style={styles.welcomeText}>
+            Bienvenido, {user?.first_name || 'Usuario'}
+          </Text>
         </View>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
@@ -159,20 +330,20 @@ export default function DataListScreen({ route, navigation }) {
       <FlatList
         data={data}
         renderItem={renderRouteCard}
-        keyExtractor={(item) => item.id.toString()}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No hay rutas disponibles</Text>
-          </View>
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#007AFF']}
+            tintColor="#007AFF"
+          />
         }
       />
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -183,6 +354,183 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#FF3B30',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  listContainer: {
+    padding: 16,
+  },
+  routeCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  selectedRouteCard: {
+    borderColor: '#007AFF',
+    borderWidth: 2,
+  },
+  routeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  routeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  routeDescription: {
+    color: '#666',
+    marginBottom: 12,
+  },
+  routeDetails: {
+    marginBottom: 12,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  detailText: {
+    marginLeft: 8,
+    color: '#666',
+  },
+  mapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E3F2FD',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  mapButtonText: {
+    color: '#007AFF',
+    marginLeft: 8,
+    fontWeight: '600',
+  },
+  studentsModal: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    maxHeight: '60%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  modalHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  studentsList: {
+    paddingBottom: 16,
+  },
+  studentItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  studentInfo: {
+    flex: 1,
+  },
+  studentName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  studentDetails: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  attendanceButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+  },
+  attendanceText: {
+    fontSize: 20,
+  },
+  saveButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  saveButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  changedAttendanceButton: {
+    backgroundColor: '#E3F2FD',
   },
   header: {
     padding: 15,
@@ -211,94 +559,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  listContainer: {
-    padding: 10,
-  },
-  routeCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  routeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  routeTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  routeDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-  },
-  routeDetails: {
-    marginTop: 8,
-  },
-  scheduleText: {
-    fontSize: 14,
-    color: '#444',
-    marginBottom: 8,
-  },
-  locationContainer: {
-    marginTop: 4,
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#444',
-    marginBottom: 4,
-  },
-  cardFooter: {
-    marginTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 12,
-  },
-  driverText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  viewMapText: {
-    color: '#007AFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-}); 
+});
+
+export default DataListScreen; 
