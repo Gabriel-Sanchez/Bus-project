@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,6 +10,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 
 const StudentsListScreen = () => {
   const navigation = useNavigation();
@@ -18,6 +19,61 @@ const StudentsListScreen = () => {
   const [attendanceChanges, setAttendanceChanges] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [students, setStudents] = useState(selectedRoute.students);
+  const [isOnline, setIsOnline] = useState(true);
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'pending' | 'synced' | 'error'
+
+  useEffect(() => {
+    // Cargar cambios pendientes al iniciar
+    loadPendingChanges();
+    
+    // Configurar listener de conexión
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected);
+      if (state.isConnected && Object.keys(attendanceChanges).length > 0) {
+        setSyncStatus('pending');
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const loadPendingChanges = async () => {
+    try {
+      const pendingChanges = await AsyncStorage.getItem(`pending_changes_${selectedRoute.id}`);
+      if (pendingChanges) {
+        const parsedChanges = JSON.parse(pendingChanges);
+        setAttendanceChanges(parsedChanges);
+        setSyncStatus('pending');
+        
+        // Aplicar los cambios pendientes al estado visual
+        setStudents(prevStudents => 
+          prevStudents.map(student => {
+            const change = parsedChanges[student.id];
+            if (change) {
+              return { ...student, attendance_status: change.status };
+            }
+            return student;
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Error loading pending changes:', error);
+    }
+  };
+
+  const saveChangesLocally = async (changes) => {
+    try {
+      await AsyncStorage.setItem(
+        `pending_changes_${selectedRoute.id}`,
+        JSON.stringify(changes)
+      );
+      setSyncStatus('pending');
+    } catch (error) {
+      console.error('Error saving changes locally:', error);
+    }
+  };
 
   const handleAttendancePress = (student, currentStatus) => {
     const newStatus = currentStatus === 'pending' ? 'present' : 
@@ -30,15 +86,17 @@ const StudentsListScreen = () => {
       )
     );
 
-    // Guardar el cambio para enviar a la API
-    setAttendanceChanges(prev => ({
-      ...prev,
+    // Guardar el cambio localmente
+    const newChanges = {
+      ...attendanceChanges,
       [student.id]: {
         status: newStatus,
         route_id: selectedRoute.id,
         timestamp: new Date().toISOString()
       }
-    }));
+    };
+    setAttendanceChanges(newChanges);
+    saveChangesLocally(newChanges);
   };
 
   const getAttendanceIcon = (status) => {
@@ -52,9 +110,34 @@ const StudentsListScreen = () => {
     }
   };
 
-  const saveAttendanceChanges = async () => {
+  const getSyncStatusText = () => {
+    switch (syncStatus) {
+      case 'pending':
+        return 'Pendiente por enviar';
+      case 'synced':
+        return 'Cambios guardados';
+      case 'error':
+        return 'Error al guardar';
+      default:
+        return '';
+    }
+  };
+
+  const getSyncStatusColor = () => {
+    switch (syncStatus) {
+      case 'pending':
+        return '#FFA000';
+      case 'synced':
+        return '#4CAF50';
+      case 'error':
+        return '#FF3B30';
+      default:
+        return '#666';
+    }
+  };
+
+  const syncChanges = async () => {
     if (Object.keys(attendanceChanges).length === 0) {
-      Alert.alert('Información', 'No hay cambios para guardar');
       return;
     }
 
@@ -66,7 +149,7 @@ const StudentsListScreen = () => {
         return;
       }
 
-      const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/update-attendance/', {
+      const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/update-attendance/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -78,14 +161,17 @@ const StudentsListScreen = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Error al guardar los cambios');
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error(errorData.message || 'Error al guardar los cambios');
       }
 
+      await AsyncStorage.removeItem(`pending_changes_${selectedRoute.id}`);
       setAttendanceChanges({});
-      Alert.alert('Éxito', 'Los cambios se han guardado correctamente');
+      setSyncStatus('synced');
     } catch (err) {
-      Alert.alert('Error', 'No se pudieron guardar los cambios');
       console.error('Error saving attendance:', err);
+      setSyncStatus('error');
     } finally {
       setIsSaving(false);
     }
@@ -121,18 +207,26 @@ const StudentsListScreen = () => {
         <View style={styles.headerLeft}>
           <Text style={styles.title}>{selectedRoute.title}</Text>
           <Text style={styles.subtitle}>Lista de Estudiantes</Text>
+          {!isOnline && (
+            <Text style={styles.offlineText}>Modo sin conexión</Text>
+          )}
         </View>
         <View style={styles.headerRight}>
           {Object.keys(attendanceChanges).length > 0 && (
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={saveAttendanceChanges}
-              disabled={isSaving}
-            >
-              <Text style={styles.saveButtonText}>
-                {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+            <View style={styles.saveContainer}>
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={syncChanges}
+                disabled={isSaving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={[styles.syncStatus, { color: getSyncStatusColor() }]}>
+                {getSyncStatusText()}
               </Text>
-            </TouchableOpacity>
+            </View>
           )}
         </View>
       </View>
@@ -219,6 +313,9 @@ const styles = StyleSheet.create({
   attendanceText: {
     fontSize: 20,
   },
+  saveContainer: {
+    alignItems: 'flex-end',
+  },
   saveButton: {
     backgroundColor: '#4CAF50',
     paddingHorizontal: 16,
@@ -228,6 +325,16 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  offlineText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  syncStatus: {
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'right',
   },
 });
 

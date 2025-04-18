@@ -165,7 +165,7 @@ const DataListScreen = () => {
         return;
       }
 
-      const response = await fetch('http://192.168.1.2:8000/api/update-attendance/', {
+      const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/update-attendance/', {
         method: 'POST',
         headers: {
           'Authorization': `Token ${token}`,
