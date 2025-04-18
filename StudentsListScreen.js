@@ -273,10 +273,11 @@ const StudentsListScreen = () => {
           longitude: selectedRoute.end_location.longitude,
         },
         routeInfo: {
+          id: selectedRoute.id,
           title: selectedRoute.title,
           description: selectedRoute.description,
           schedule: selectedRoute.schedule,
-          status: newStatus // Agregar el estado a la información de la ruta
+          status: newStatus
         }
       });
     } catch (err) {
@@ -292,10 +293,11 @@ const StudentsListScreen = () => {
           longitude: selectedRoute.end_location.longitude,
         },
         routeInfo: {
+          id: selectedRoute.id,
           title: selectedRoute.title,
           description: selectedRoute.description,
           schedule: selectedRoute.schedule,
-          status: newStatus // Agregar el estado a la información de la ruta
+          status: newStatus
         }
       });
     }

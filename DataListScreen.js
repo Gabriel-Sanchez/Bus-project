@@ -134,7 +134,15 @@ const DataListScreen = () => {
   };
 
   const handleRoutePress = (route) => {
-    navigation.navigate('StudentsList', { route });
+    navigation.navigate('StudentsList', { 
+      route: {
+        ...route,
+        students: route.students.map(student => ({
+          ...student,
+          attendance_status: student.attendance_status || 'pending'
+        }))
+      }
+    });
   };
 
   const handleMapPress = (route) => {

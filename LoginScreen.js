@@ -8,7 +8,6 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState('');
@@ -35,15 +34,14 @@ export default function LoginScreen({ navigation }) {
       });
 
       const data = await response.json();
-      console.log('Respuesta del login:', data);
+      console.log('Respuesta del login:', data); // Log para debug
 
       if (response.ok && data.token) {
-        // Guardar el token y la información del usuario en AsyncStorage
-        await AsyncStorage.setItem('token', data.token);
-        await AsyncStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Navegar a la pantalla de lista de datos
-        navigation.replace('DataList');
+        // Navegar a la pantalla de lista de datos con el token y username
+        navigation.replace('DataList', {
+          token: data.token,
+          username: username
+        });
       } else {
         Alert.alert('Error', data.message || 'Error al iniciar sesión');
       }
