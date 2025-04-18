@@ -52,7 +52,11 @@ const StudentsListScreen = () => {
           prevStudents.map(student => {
             const change = parsedChanges[student.id];
             if (change) {
-              return { ...student, attendance_status: change.status };
+              return { 
+                ...student, 
+                attendance_status: change.status,
+                last_attendance_timestamp: change.timestamp
+              };
             }
             return student;
           })
@@ -79,10 +83,16 @@ const StudentsListScreen = () => {
     const newStatus = currentStatus === 'pending' ? 'present' : 
                      currentStatus === 'present' ? 'absent' : 'pending';
     
+    const timestamp = new Date().toISOString();
+    
     // Actualizar el estado visual de los estudiantes
     setStudents(prevStudents => 
       prevStudents.map(s => 
-        s.id === student.id ? { ...s, attendance_status: newStatus } : s
+        s.id === student.id ? { 
+          ...s, 
+          attendance_status: newStatus,
+          last_attendance_timestamp: timestamp
+        } : s
       )
     );
 
@@ -92,7 +102,7 @@ const StudentsListScreen = () => {
       [student.id]: {
         status: newStatus,
         route_id: selectedRoute.id,
-        timestamp: new Date().toISOString()
+        timestamp: timestamp
       }
     };
     setAttendanceChanges(newChanges);
@@ -108,6 +118,16 @@ const StudentsListScreen = () => {
       default:
         return '🟡';
     }
+  };
+
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('es-PA', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   const getSyncStatusText = () => {
@@ -183,9 +203,16 @@ const StudentsListScreen = () => {
         <Text style={styles.studentName}>
           {item.first_name} {item.last_name}
         </Text>
-        <Text style={styles.studentDetails}>
-          {item.group?.name} • {item.pickup_time}
-        </Text>
+        <View style={styles.studentDetailsContainer}>
+          <Text style={styles.studentDetails}>
+            {item.group?.name} • {item.pickup_time}
+          </Text>
+          {item.last_attendance_timestamp && (
+            <Text style={styles.attendanceTime}>
+              Último registro: {formatTimestamp(item.last_attendance_timestamp)}
+            </Text>
+          )}
+        </View>
       </View>
       <TouchableOpacity
         style={[
@@ -297,10 +324,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
+  studentDetailsContainer: {
+    marginTop: 4,
+  },
   studentDetails: {
     fontSize: 14,
     color: '#666',
-    marginTop: 4,
+  },
+  attendanceTime: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
   attendanceButton: {
     padding: 12,
