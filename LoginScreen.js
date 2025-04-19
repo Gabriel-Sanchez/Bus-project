@@ -8,15 +8,16 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function LoginScreen({ navigation }) {
+const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!username || !password) {
-      Alert.alert('Error', 'Por favor complete todos los campos');
+      Alert.alert('Error', 'Por favor ingrese usuario y contraseña');
       return;
     }
 
@@ -34,20 +35,22 @@ export default function LoginScreen({ navigation }) {
       });
 
       const data = await response.json();
-      console.log('Respuesta del login:', data); // Log para debug
 
-      if (response.ok && data.token) {
-        // Navegar a la pantalla de lista de datos con el token y username
-        navigation.replace('DataList', {
-          token: data.token,
-          username: username
-        });
-      } else {
-        Alert.alert('Error', data.message || 'Error al iniciar sesión');
+      if (!response.ok) {
+        throw new Error(data.detail || 'Error al iniciar sesión');
       }
+
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      
+      console.log('Login exitoso, navegando a DataList');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'DataList' }],
+      });
     } catch (error) {
-      console.error('Error completo:', error);
-      Alert.alert('Error', 'Error de conexión');
+      console.error('Error en login:', error);
+      Alert.alert('Error', error.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
@@ -76,20 +79,18 @@ export default function LoginScreen({ navigation }) {
         />
 
         <TouchableOpacity 
-          style={styles.button}
+          style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleLogin}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Iniciar Sesión</Text>
-          )}
+          <Text style={styles.buttonText}>
+            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -132,9 +133,14 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     alignItems: 'center',
   },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
+  },
   buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
-}); 
+});
+
+export default LoginScreen; 
