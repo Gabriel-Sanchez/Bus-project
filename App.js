@@ -1,5 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import SplashScreen from './SplashScreen';
 import LoginScreen from './LoginScreen';
 import DataListScreen from './DataListScreen';
 import StudentsListScreen from './StudentsListScreen';
@@ -301,7 +302,12 @@ function HomeScreen({ route, navigation }) {
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login">
+      <Stack.Navigator initialRouteName="Splash">
+        <Stack.Screen 
+          name="Splash" 
+          component={SplashScreen} 
+          options={{ headerShown: false }}
+        />
         <Stack.Screen 
           name="Login" 
           component={LoginScreen} 
