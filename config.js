@@ -6,6 +6,7 @@ const API_CONFIG = {
     UPDATE_ATTENDANCE: '/api/users/update-attendance/',
     UPDATE_ROUTE_STATUS: '/api/users/update-route-status/',
     DATA: '/api/users/data/',
+    PARENT_DATA: '/api/users/data/', // Nuevo endpoint para padres
     ROUTE_LOCATION: '/api/users/routes', // Se usa con /${routeId}/location/
   }
 };
@@ -28,6 +29,7 @@ const API_URLS = {
   UPDATE_ATTENDANCE: buildApiUrl(API_CONFIG.ENDPOINTS.UPDATE_ATTENDANCE),
   UPDATE_ROUTE_STATUS: buildApiUrl(API_CONFIG.ENDPOINTS.UPDATE_ROUTE_STATUS),
   DATA: buildApiUrl(API_CONFIG.ENDPOINTS.DATA),
+  PARENT_DATA: buildApiUrl(API_CONFIG.ENDPOINTS.PARENT_DATA), // Nueva URL para padres
   ROUTE_LOCATION: (routeId) => `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ROUTE_LOCATION}/${routeId}/location/`,
 };
 

@@ -44,11 +44,23 @@ const LoginScreen = ({ navigation }) => {
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
       
-      console.log('Login exitoso, navegando a DataList');
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'DataList' }],
-      });
+      console.log('Login exitoso, usuario:', data.user);
+      console.log('is_driver:', data.user.is_driver);
+      
+      // Redirigir según el tipo de usuario
+      if (data.user.is_driver) {
+        console.log('Navegando a DataList (Conductor)');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'DataList' }],
+        });
+      } else {
+        console.log('Navegando a ParentData (Padre/Madre)');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'ParentData' }],
+        });
+      }
     } catch (error) {
       console.error('Error en login:', error);
       Alert.alert('Error', error.message || 'Error al iniciar sesión');

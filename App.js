@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from './SplashScreen';
 import LoginScreen from './LoginScreen';
 import DataListScreen from './DataListScreen';
+import ParentDataScreen from './ParentDataScreen';
 import StudentsListScreen from './StudentsListScreen';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
@@ -319,6 +320,14 @@ export default function App() {
           component={DataListScreen}
           options={{ 
             title: 'Rutas Disponibles',
+            headerBackVisible: false
+          }}
+        />
+        <Stack.Screen 
+          name="ParentData" 
+          component={ParentDataScreen}
+          options={{ 
+            title: 'Mi Información',
             headerBackVisible: false
           }}
         />
