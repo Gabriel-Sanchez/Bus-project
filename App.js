@@ -4,6 +4,7 @@ import SplashScreen from './SplashScreen';
 import LoginScreen from './LoginScreen';
 import DataListScreen from './DataListScreen';
 import ParentDataScreen from './ParentDataScreen';
+import RouteTrackingScreen from './RouteTrackingScreen';
 import StudentsListScreen from './StudentsListScreen';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
@@ -330,6 +331,14 @@ export default function App() {
             title: 'Mi Información',
             headerBackVisible: false
           }}
+        />
+        <Stack.Screen 
+          name="RouteTracking" 
+          component={RouteTrackingScreen}
+          options={({ route }) => ({ 
+            title: `Tracking: ${route.params?.routeData?.title || 'Ruta'}`,
+            headerBackTitle: 'Volver'
+          })}
         />
         <Stack.Screen 
           name="StudentsList" 

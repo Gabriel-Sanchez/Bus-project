@@ -8,6 +8,7 @@ const API_CONFIG = {
     DATA: '/api/users/data/',
     PARENT_DATA: '/api/users/data/', // Nuevo endpoint para padres
     ROUTE_LOCATION: '/api/users/routes', // Se usa con /${routeId}/location/
+    ROUTE_TRACKING: '/api/users/routes', // Se usa con /${routeId}/location/ para padres
   }
 };
 
@@ -31,6 +32,7 @@ const API_URLS = {
   DATA: buildApiUrl(API_CONFIG.ENDPOINTS.DATA),
   PARENT_DATA: buildApiUrl(API_CONFIG.ENDPOINTS.PARENT_DATA), // Nueva URL para padres
   ROUTE_LOCATION: (routeId) => `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ROUTE_LOCATION}/${routeId}/location/`,
+  ROUTE_TRACKING: (routeId) => `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ROUTE_TRACKING}/${routeId}/location/`, // Nueva URL para tracking de padres
 };
 
 module.exports = {

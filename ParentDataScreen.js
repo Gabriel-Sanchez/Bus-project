@@ -159,7 +159,11 @@ const ParentDataScreen = () => {
   );
 
   const renderRouteCard = ({ item }) => (
-    <View style={styles.routeCard}>
+    <TouchableOpacity 
+      style={styles.routeCard}
+      onPress={() => handleRoutePress(item)}
+      disabled={item.status !== 'active' && item.status !== 'pending'}
+    >
       <View style={styles.routeHeader}>
         <Text style={styles.routeTitle}>{item.title}</Text>
         <View style={[
@@ -184,8 +188,25 @@ const ParentDataScreen = () => {
           </Text>
         </View>
       ))}
-    </View>
+
+      {(item.status === 'active' || item.status === 'pending') && (
+        <View style={styles.trackingHint}>
+          <Ionicons name="location" size={16} color="#007AFF" />
+          <Text style={styles.trackingHintText}>
+            Toca para ver ubicación en tiempo real
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
   );
+
+  const handleRoutePress = (route) => {
+    if (route.status === 'active' || route.status === 'pending') {
+      navigation.navigate('RouteTracking', {
+        routeData: route
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -488,6 +509,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 4,
+  },
+  trackingHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
+  },
+  trackingHintText: {
+    color: '#007AFF',
+    marginLeft: 8,
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
 
