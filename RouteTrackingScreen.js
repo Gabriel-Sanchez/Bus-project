@@ -32,21 +32,25 @@ const RouteTrackingScreen = () => {
   const [trackingData, setTrackingData] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [hasValidData, setHasValidData] = useState(false);
 
   useEffect(() => {
     fetchRouteLocation();
     
     // Configurar actualización automática cada 60 segundos
     const interval = setInterval(() => {
-      fetchRouteLocation(true); // true indica que es una actualización automática
+      if (hasValidData) { // Solo actualizar si tenemos datos válidos
+        fetchRouteLocation(true); // true indica que es una actualización automática
+      }
     }, 60000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [hasValidData]);
 
-  // Ajustar el mapa cuando cambian las ubicaciones
+  // Solo ajustar el mapa en la carga inicial o cuando el usuario hace refresh manual
   useEffect(() => {
-    if (trackingData && mapRef.current) {
+    if (trackingData && mapRef.current && isInitialLoad) {
       const currentLocation = {
         latitude: parseFloat(trackingData.current_latitude),
         longitude: parseFloat(trackingData.current_longitude),
@@ -56,7 +60,7 @@ const RouteTrackingScreen = () => {
         longitude: parseFloat(trackingData.end_longitude),
       };
 
-      // Ajustar el mapa para mostrar ambas ubicaciones
+      // Solo ajustar el mapa en la primera carga
       mapRef.current.fitToCoordinates([currentLocation, endLocation], {
         edgePadding: {
           top: 50,
@@ -66,14 +70,93 @@ const RouteTrackingScreen = () => {
         },
         animated: true,
       });
+      
+      setIsInitialLoad(false);
     }
-  }, [trackingData]);
+  }, [trackingData, isInitialLoad]);
+
+  const validateLocationData = (data) => {
+    console.log('🔍 ========== INICIANDO VALIDACIÓN ==========');
+    
+    if (!data) {
+      console.error('❌ No se recibieron datos para validar');
+      return { isValid: false, message: 'No se recibieron datos de la ruta' };
+    }
+    
+    console.log('📊 Validando datos recibidos...');
+    const missingFields = [];
+    
+    // Validar ubicación actual del bus
+    console.log('🚌 Validando ubicación actual del bus...');
+    if (!data.current_latitude || isNaN(parseFloat(data.current_latitude))) {
+      console.warn('⚠️ current_latitude faltante o inválida:', data.current_latitude);
+      missingFields.push('current_latitude');
+    } else {
+      console.log('✅ current_latitude válida:', data.current_latitude);
+    }
+    
+    if (!data.current_longitude || isNaN(parseFloat(data.current_longitude))) {
+      console.warn('⚠️ current_longitude faltante o inválida:', data.current_longitude);
+      missingFields.push('current_longitude');
+    } else {
+      console.log('✅ current_longitude válida:', data.current_longitude);
+    }
+    
+    // Validar ubicación de destino
+    console.log('🏫 Validando ubicación de destino...');
+    if (!data.end_latitude || isNaN(parseFloat(data.end_latitude))) {
+      console.warn('⚠️ end_latitude faltante o inválida:', data.end_latitude);
+      missingFields.push('end_latitude');
+    } else {
+      console.log('✅ end_latitude válida:', data.end_latitude);
+    }
+    
+    if (!data.end_longitude || isNaN(parseFloat(data.end_longitude))) {
+      console.warn('⚠️ end_longitude faltante o inválida:', data.end_longitude);
+      missingFields.push('end_longitude');
+    } else {
+      console.log('✅ end_longitude válida:', data.end_longitude);
+    }
+    
+    console.log('📋 Campos faltantes o inválidos:', missingFields);
+    
+    if (missingFields.length === 0) {
+      console.log('✅ Todos los campos de ubicación son válidos');
+      return { isValid: true, message: null };
+    }
+    
+    // Generar mensajes específicos según qué falte
+    let message = '';
+    const hasCurrentIssues = missingFields.some(field => field.includes('current_'));
+    const hasEndIssues = missingFields.some(field => field.includes('end_'));
+    
+    console.log('🔍 Análisis de problemas:');
+    console.log('🚌 Problemas con ubicación actual:', hasCurrentIssues);
+    console.log('🏫 Problemas con ubicación destino:', hasEndIssues);
+    
+    if (hasCurrentIssues && hasEndIssues) {
+      message = 'No se tienen datos de ubicación actual del bus ni del destino';
+      console.warn('❌ Error: Faltan ambas ubicaciones');
+    } else if (hasCurrentIssues) {
+      message = 'Aún no se tienen datos de la ubicación actual del bus';
+      console.warn('❌ Error: Falta ubicación actual del bus');
+    } else if (hasEndIssues) {
+      message = 'No se tienen datos de la ubicación de destino';
+      console.warn('❌ Error: Falta ubicación de destino');
+    }
+    
+    console.log('📝 Mensaje de error generado:', message);
+    console.log('🔍 ========== FIN VALIDACIÓN ==========');
+    
+    return { isValid: false, message };
+  };
 
   const fetchRouteLocation = async (isAutoUpdate = false) => {
     if (isAutoUpdate) {
       setRefreshing(true);
     } else {
       setLoading(true);
+      setIsInitialLoad(!hasValidData); // Si es manual y no teníamos datos válidos, es como inicial
     }
 
     try {
@@ -83,6 +166,11 @@ const RouteTrackingScreen = () => {
         return;
       }
 
+      console.log('🔄 Fetching route location data...');
+      console.log('📍 Route ID:', routeData.id);
+      console.log('🌐 API URL:', API_URLS.ROUTE_TRACKING(routeData.id));
+      console.log('🔄 Is auto update:', isAutoUpdate);
+
       const response = await fetch(API_URLS.ROUTE_TRACKING(routeData.id), {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -90,23 +178,106 @@ const RouteTrackingScreen = () => {
         }
       });
 
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+
       if (!response.ok) {
-        throw new Error('Error al obtener la ubicación de la ruta');
+        console.error('❌ HTTP Error:', response.status, response.statusText);
+        throw new Error(`Error ${response.status}: No se pudo obtener la ubicación de la ruta`);
       }
 
       const result = await response.json();
+      
+      // ========== LOGS DETALLADOS DE TODOS LOS DATOS ==========
+      console.log('📊 ========== DATOS COMPLETOS RECIBIDOS ==========');
+      console.log('🔍 Raw response data:', JSON.stringify(result, null, 2));
+      console.log('');
+      
+      console.log('📋 ========== ANÁLISIS DE CAMPOS ==========');
+      console.log('🆔 ID de ruta:', result.id);
+      console.log('📛 Título de ruta:', result.title);
+      console.log('🚦 Estado de ruta:', result.status);
+      console.log('');
+      
+      console.log('🚌 ========== UBICACIÓN ACTUAL DEL BUS ==========');
+      console.log('🌐 Latitud actual:', result.current_latitude);
+      console.log('🌐 Longitud actual:', result.current_longitude);
+      console.log('📍 Coordenadas actuales válidas:', 
+        result.current_latitude && !isNaN(parseFloat(result.current_latitude)) &&
+        result.current_longitude && !isNaN(parseFloat(result.current_longitude))
+      );
+      console.log('');
+      
+      console.log('🏫 ========== UBICACIÓN DE DESTINO ==========');
+      console.log('📍 Nombre destino:', result.end_location_name);
+      console.log('🌐 Latitud destino:', result.end_latitude);
+      console.log('🌐 Longitud destino:', result.end_longitude);
+      console.log('📍 Coordenadas destino válidas:', 
+        result.end_latitude && !isNaN(parseFloat(result.end_latitude)) &&
+        result.end_longitude && !isNaN(parseFloat(result.end_longitude))
+      );
+      console.log('');
+      
+      console.log('⏰ ========== INFORMACIÓN TEMPORAL ==========');
+      console.log('🕒 Actualizado en servidor:', result.updated_at);
+      console.log('🕒 Timestamp local:', new Date().toISOString());
+      console.log('');
+      
+      console.log('🔍 ========== CAMPOS ADICIONALES ==========');
+      Object.keys(result).forEach(key => {
+        if (!['id', 'title', 'status', 'current_latitude', 'current_longitude', 
+              'end_location_name', 'end_latitude', 'end_longitude', 'updated_at'].includes(key)) {
+          console.log(`📌 ${key}:`, result[key]);
+        }
+      });
+      console.log('');
+      
+      // Validar que los datos de ubicación sean válidos
+      const validation = validateLocationData(result);
+      console.log('✅ ========== VALIDACIÓN DE DATOS ==========');
+      console.log('🔍 Validación exitosa:', validation.isValid);
+      if (!validation.isValid) {
+        console.error('❌ Error de validación:', validation.message);
+        console.log('');
+      }
+      
+      if (!validation.isValid) {
+        throw new Error(validation.message);
+      }
+
+      console.log('✅ Datos válidos - Actualizando estado...');
       setTrackingData(result);
       setLastUpdated(new Date());
       setError(null);
+      setHasValidData(true);
+      
+      console.log('✅ Estado actualizado exitosamente');
+      console.log('📊 ========================================');
+      
     } catch (err) {
-      console.error('Error fetching route location:', err);
+      console.error('❌ ========== ERROR EN TRACKING ==========');
+      console.error('💥 Error type:', err.name);
+      console.error('💥 Error message:', err.message);
+      console.error('💥 Error stack:', err.stack);
+      console.error('🔄 Is auto update:', isAutoUpdate);
+      console.error('📊 =====================================');
+      
       if (!isAutoUpdate) {
+        // Solo mostrar error en actualizaciones manuales
         setError(err.message);
-        Alert.alert('Error', 'No se pudo obtener la ubicación de la ruta');
+        Alert.alert(
+          'Datos Incompletos', 
+          err.message,
+          [{ text: 'OK' }]
+        );
+      } else {
+        // En actualizaciones automáticas, solo loguear el error
+        console.warn('⚠️ Actualización automática falló:', err.message);
       }
     } finally {
       setLoading(false);
       setRefreshing(false);
+      console.log('🏁 Fetch route location completed');
     }
   };
 
@@ -147,10 +318,12 @@ const RouteTrackingScreen = () => {
   };
 
   const handleRefresh = () => {
+    setIsInitialLoad(false); // No reajustar el zoom en refresh manual
     fetchRouteLocation();
   };
 
-  if (loading) {
+  // Loading inicial
+  if (loading && !trackingData) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -159,9 +332,12 @@ const RouteTrackingScreen = () => {
     );
   }
 
+  // Error sin datos previos
   if (error && !trackingData) {
     return (
       <View style={styles.errorContainer}>
+        <Ionicons name="warning-outline" size={48} color="#FF3B30" />
+        <Text style={styles.errorTitle}>Sin Conexión</Text>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
           <Text style={styles.retryButtonText}>Reintentar</Text>
@@ -170,13 +346,49 @@ const RouteTrackingScreen = () => {
     );
   }
 
-  if (!trackingData) {
+  // Fallback si no hay datos válidos
+  if (!trackingData || !validateLocationData(trackingData).isValid) {
+    const validation = validateLocationData(trackingData);
+    const errorMessage = validation.message || 'No se pueden mostrar los datos de ubicación de esta ruta en este momento.';
+    
+    // Determinar ícono y color según el tipo de error
+    let iconName = "location-outline";
+    let iconColor = "#FFA000";
+    let titleText = "Datos No Disponibles";
+    
+    if (errorMessage.includes('Aún no se tienen datos de la ubicación actual')) {
+      iconName = "bus-outline";
+      iconColor = "#007AFF";
+      titleText = "Esperando Ubicación del Bus";
+    } else if (errorMessage.includes('destino')) {
+      iconName = "flag-outline";
+      iconColor = "#FF3B30";
+      titleText = "Error en Datos de Destino";
+    } else if (errorMessage.includes('No se recibieron datos')) {
+      iconName = "cloud-offline-outline";
+      iconColor = "#666666";
+      titleText = "Sin Datos del Servidor";
+    }
+    
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>No se encontraron datos de la ruta</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-          <Text style={styles.retryButtonText}>Reintentar</Text>
-        </TouchableOpacity>
+        <Ionicons name={iconName} size={48} color={iconColor} />
+        <Text style={[styles.errorTitle, { color: iconColor }]}>{titleText}</Text>
+        <Text style={styles.errorText}>
+          {errorMessage}
+        </Text>
+        {errorMessage.includes('Aún no se tienen datos de la ubicación actual') ? (
+          <View style={styles.waitingContainer}>
+            <ActivityIndicator size="small" color="#007AFF" />
+            <Text style={styles.waitingText}>
+              El conductor debe iniciar la ruta para comenzar el tracking
+            </Text>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+            <Text style={styles.retryButtonText}>Intentar Nuevamente</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -234,9 +446,18 @@ const RouteTrackingScreen = () => {
             Última actualización: {formatLastUpdated(lastUpdated)}
           </Text>
         )}
+        
+        {error && trackingData && (
+          <View style={styles.warningContainer}>
+            <Ionicons name="warning" size={16} color="#FFA000" />
+            <Text style={styles.warningText}>
+              Problema de conexión - Mostrando última ubicación conocida
+            </Text>
+          </View>
+        )}
       </View>
 
-      {/* Mapa */}
+      {/* Mapa - Solo se re-renderiza cuando cambian las coordenadas */}
       <MapView
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
@@ -249,6 +470,9 @@ const RouteTrackingScreen = () => {
         }}
         showsCompass={true}
         showsScale={true}
+        showsUserLocation={false}
+        followsUserLocation={false}
+        key={`${currentLocation.latitude}-${currentLocation.longitude}`} // Forzar re-render solo cuando cambian las coordenadas
       >
         {/* Marcador de ubicación actual del bus */}
         <Marker
@@ -267,6 +491,11 @@ const RouteTrackingScreen = () => {
               <Text style={styles.calloutStatus}>
                 Estado: {getStatusText(trackingData.status)}
               </Text>
+              {lastUpdated && (
+                <Text style={styles.calloutTime}>
+                  Actualizado: {formatLastUpdated(lastUpdated)}
+                </Text>
+              )}
             </View>
           </Callout>
         </Marker>
@@ -305,6 +534,11 @@ const RouteTrackingScreen = () => {
         <Text style={styles.footerText}>
           🔄 Actualizando automáticamente cada 60 segundos
         </Text>
+        {hasValidData && (
+          <Text style={styles.footerSubText}>
+            💡 Pellizca para hacer zoom • Arrastra para moverte
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -333,21 +567,30 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f5f5f5',
   },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
   errorText: {
-    color: '#FF3B30',
+    color: '#666',
     marginBottom: 20,
     textAlign: 'center',
     fontSize: 16,
+    lineHeight: 22,
   },
   retryButton: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   header: {
     backgroundColor: '#fff',
@@ -413,6 +656,20 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
   },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#FFF3CD',
+    borderRadius: 6,
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#856404',
+    marginLeft: 6,
+    flex: 1,
+  },
   map: {
     flex: 1,
   },
@@ -450,6 +707,11 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '600',
   },
+  calloutTime: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 2,
+  },
   footer: {
     backgroundColor: '#f8f9fa',
     padding: 12,
@@ -461,6 +723,29 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  footerSubText: {
+    fontSize: 11,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  waitingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
+  },
+  waitingText: {
+    fontSize: 14,
+    color: '#1976D2',
+    marginLeft: 8,
+    flex: 1,
+    textAlign: 'center',
   },
 });
 
