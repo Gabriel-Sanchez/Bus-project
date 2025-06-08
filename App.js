@@ -57,7 +57,7 @@ function HomeScreen({ route, navigation }) {
         status: 'inactive'
       });
 
-      const response = await fetch(`https://6sqzxskf-9000.use2.devtunnels.ms/api/users/update-route-status/`, {
+      const response = await fetch(`https://5fb7hk72-9000.use2.devtunnels.ms/api/users/update-route-status/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

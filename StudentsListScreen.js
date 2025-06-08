@@ -210,7 +210,7 @@ const StudentsListScreen = () => {
         return;
       }
 
-      const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/update-attendance/', {
+      const response = await fetch('https://5fb7hk72-9000.use2.devtunnels.ms/api/users/update-attendance/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -247,7 +247,7 @@ const StudentsListScreen = () => {
         return;
       }
 
-      const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/update-route-status/', {
+      const response = await fetch('https://5fb7hk72-9000.use2.devtunnels.ms/api/users/update-route-status/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

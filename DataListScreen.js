@@ -88,7 +88,7 @@ const DataListScreen = () => {
 
   const fetchData = async (token) => {
     try {
-      const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/data/', {
+      const response = await fetch('https://5fb7hk72-9000.use2.devtunnels.ms/api/users/data/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -173,7 +173,7 @@ const DataListScreen = () => {
         return;
       }
 
-      const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/update-attendance/', {
+      const response = await fetch('https://5fb7hk72-9000.use2.devtunnels.ms/api/users/update-attendance/', {
         method: 'POST',
         headers: {
           'Authorization': `Token ${token}`,

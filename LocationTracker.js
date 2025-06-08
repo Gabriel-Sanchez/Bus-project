@@ -24,7 +24,7 @@ const LocationTracker = ({ routeId, currentLocation }) => {
 
       console.log('Enviando ubicación:', JSON.stringify(locationData, null, 2));
 
-      const response = await fetch(`https://6sqzxskf-9000.use2.devtunnels.ms/api/users/routes/${routeId}/location/`, {
+      const response = await fetch(`https://5fb7hk72-9000.use2.devtunnels.ms/api/users/routes/${routeId}/location/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

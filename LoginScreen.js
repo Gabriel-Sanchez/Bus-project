@@ -23,7 +23,7 @@ const LoginScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('https://6sqzxskf-9000.use2.devtunnels.ms/api/users/login/', {
+      const response = await fetch('https://5fb7hk72-9000.use2.devtunnels.ms/api/users/login/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
