@@ -27,19 +27,30 @@ const DataListScreen = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
+      console.log('🚗 ========== VISTA CONDUCTOR - INICIANDO ==========');
       try {
         const token = await AsyncStorage.getItem('token');
         const userData = await AsyncStorage.getItem('user');
         
+        console.log('🔑 Token encontrado:', token ? 'Sí' : 'No');
+        console.log('👤 Datos de usuario encontrados:', userData ? 'Sí' : 'No');
+        
         if (!token || !userData) {
+          console.warn('⚠️ Token o datos de usuario faltantes, redirigiendo a Login');
           navigation.replace('Login');
           return;
         }
         
-        setUser(JSON.parse(userData));
+        const parsedUser = JSON.parse(userData);
+        console.log('👤 Usuario parseado:', JSON.stringify(parsedUser, null, 2));
+        console.log('🚗 Es conductor:', parsedUser.is_driver);
+        
+        setUser(parsedUser);
+        
+        console.log('📡 Iniciando carga de datos de conductor...');
         fetchData(token);
       } catch (err) {
-        console.error('Error checking auth:', err);
+        console.error('❌ Error checking auth:', err);
         navigation.replace('Login');
       }
     };
@@ -48,47 +59,73 @@ const DataListScreen = () => {
   }, []);
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro que deseas cerrar sesión?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel'
-        },
-        {
-          text: 'Sí, cerrar sesión',
-          onPress: async () => {
-            try {
-              await AsyncStorage.removeItem('token');
-              await AsyncStorage.removeItem('user');
-              navigation.replace('Login');
-            } catch (error) {
-              console.error('Error al cerrar sesión:', error);
-            }
-          },
-          style: 'destructive'
-        }
-      ]
-    );
+    console.log('🚪 ========== CERRANDO SESIÓN CONDUCTOR ==========');
+    console.log('🔓 Limpiando datos almacenados localmente...');
+    
+    try {
+      // Limpiar datos de AsyncStorage
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('user');
+      
+      console.log('🗑️ Token removido');
+      console.log('🗑️ Datos de usuario removidos');
+      
+      // Limpiar estado local
+      setUser(null);
+      setData([]);
+      setSelectedRoute(null);
+      setAttendanceChanges({});
+      
+      console.log('🧹 Estado local limpiado');
+      console.log('✅ Logout completado, navegando a Login');
+      
+      // Navegar a login
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+      
+    } catch (error) {
+      console.error('❌ Error durante logout:', error);
+      // Aún así navegar a login en caso de error
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    }
   };
 
   const onRefresh = React.useCallback(async () => {
+    console.log('🔄 ========== REFRESCANDO DATOS CONDUCTOR (PULL TO REFRESH) ==========');
     setRefreshing(true);
+    
     try {
       const token = await AsyncStorage.getItem('token');
+      console.log('🔑 Token para refresh:', token ? 'Encontrado' : 'No encontrado');
+      
       if (token) {
+        console.log('📡 Iniciando refresh desde pull-to-refresh...');
         await fetchData(token);
+        console.log('✅ Pull-to-refresh completado exitosamente');
+      } else {
+        console.warn('⚠️ No se encontró token durante refresh, redirigiendo a Login');
+        navigation.replace('Login');
       }
-    } catch (err) {
-      console.error('Error al recargar:', err);
+    } catch (error) {
+      console.error('❌ Error durante pull-to-refresh:', error);
+      setError('Error al actualizar los datos');
     } finally {
       setRefreshing(false);
+      console.log('🏁 Pull-to-refresh finalizado');
     }
   }, []);
 
   const fetchData = async (token) => {
+    console.log('📊 ========== CARGANDO DATOS DE CONDUCTOR ==========');
     try {
+      console.log('🌐 API URL:', API_URLS.DATA);
+      console.log('🔑 Token usado:', token ? token.substring(0, 20) + '...' : 'null');
+      
       const response = await fetch(API_URLS.DATA, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -96,68 +133,169 @@ const DataListScreen = () => {
         }
       });
 
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+
       if (!response.ok) {
+        console.error('❌ HTTP Error:', response.status, response.statusText);
         throw new Error('Error al obtener los datos');
       }
 
       const result = await response.json();
       
+      // ========== LOGS DETALLADOS DE DATOS DE CONDUCTOR ==========
+      console.log('📊 ========== DATOS COMPLETOS DE RUTAS ==========');
+      console.log('🔍 Raw response data:', JSON.stringify(result, null, 2));
+      console.log('');
+      
+      // Extraer las rutas de la respuesta
+      const routes = result.routes || result; // Manejar tanto estructura nueva como antigua
+      const userInfo = result.user_info || {};
+      
+      console.log('📋 ========== ANÁLISIS DE RESPUESTA ==========');
+      console.log('👤 Info de usuario:', JSON.stringify(userInfo, null, 2));
+      console.log('📊 Total de rutas recibidas:', routes.length);
+      
+      routes.forEach((route, index) => {
+        console.log(`\n🚌 ========== RUTA ${index + 1} ==========`);
+        console.log('🆔 ID:', route.id);
+        console.log('📛 Título:', route.title);
+        console.log('📝 Descripción:', route.description);
+        console.log('🚦 Estado:', route.status);
+        console.log('⏰ Horario:', route.schedule);
+        
+        console.log('📍 Ubicación de inicio:');
+        console.log('  - Nombre:', route.start_location?.name);
+        console.log('  - Latitud:', route.start_location?.latitude);
+        console.log('  - Longitud:', route.start_location?.longitude);
+        
+        console.log('📍 Ubicación de fin:');
+        console.log('  - Nombre:', route.end_location?.name);
+        console.log('  - Latitud:', route.end_location?.latitude);
+        console.log('  - Longitud:', route.end_location?.longitude);
+        
+        console.log('📍 Ubicación actual del bus:');
+        console.log('  - Latitud:', route.current_location?.latitude);
+        console.log('  - Longitud:', route.current_location?.longitude);
+        
+        console.log('👥 Estudiantes en esta ruta:');
+        console.log('  - Total:', route.students?.length || 0);
+        
+        if (route.students && route.students.length > 0) {
+          route.students.forEach((student, studentIndex) => {
+            console.log(`  👤 Estudiante ${studentIndex + 1}:`);
+            console.log(`    - ID: ${student.id}`);
+            console.log(`    - Nombre: ${student.first_name} ${student.last_name}`);
+            console.log(`    - Identificación: ${student.identification}`);
+            console.log(`    - Email: ${student.email}`);
+            console.log(`    - Teléfono: ${student.phone_number}`);
+            console.log(`    - Grupo: ${student.group?.name || 'Sin grupo'}`);
+            console.log(`    - Hora recogida: ${student.pickup_time || 'N/A'}`);
+            console.log(`    - Hora destino: ${student.dropoff_time || 'N/A'}`);
+            console.log(`    - Ubicación recogida: ${student.pickup_location || 'N/A'}`);
+            console.log(`    - Ubicación destino: ${student.dropoff_location || 'N/A'}`);
+            console.log(`    - Estado asistencia: ${student.attendance_status || 'pending'}`);
+            console.log(`    - Último registro: ${student.last_attendance_timestamp || 'N/A'}`);
+          });
+        }
+        
+        console.log('🔍 Campos adicionales de la ruta:');
+        Object.keys(route).forEach(key => {
+          if (!['id', 'title', 'description', 'status', 'schedule', 'start_location', 'end_location', 'current_location', 'students'].includes(key)) {
+            console.log(`  📌 ${key}:`, route[key]);
+          }
+        });
+      });
+      
+      console.log('\n✅ ========== PROCESANDO DATOS ==========');
+      
       // Mantener los cambios de asistencia existentes
       if (selectedRoute) {
-        const updatedResult = result.map(route => {
+        console.log('🔄 Manteniendo cambios de asistencia existentes para ruta:', selectedRoute.id);
+        const updatedResult = routes.map(route => {
           if (route.id === selectedRoute.id) {
-            return {
-              ...route,
-              students: route.students.map(student => {
-                const existingChange = attendanceChanges[student.id];
-                if (existingChange) {
-                  return {
-                    ...student,
-                    attendance_status: existingChange.status
-                  };
-                }
-                return student;
-              })
-            };
+            const updatedStudents = route.students.map(student => {
+              const existingChange = attendanceChanges[student.id];
+              if (existingChange) {
+                console.log(`🔄 Aplicando cambio existente para estudiante ${student.id}:`, existingChange.status);
+                return {
+                  ...student,
+                  attendance_status: existingChange.status
+                };
+              }
+              return student;
+            });
+            return { ...route, students: updatedStudents };
           }
           return route;
         });
         setData(updatedResult);
+        console.log('✅ Datos actualizados con cambios previos');
       } else {
-        setData(result);
+        setData(routes);
+        console.log('✅ Datos establecidos sin cambios previos');
       }
+      
+      console.log('📊 ========== DATOS CARGADOS EXITOSAMENTE ==========');
+      
     } catch (err) {
+      console.error('❌ ========== ERROR CARGANDO DATOS ==========');
+      console.error('💥 Error type:', err.name);
+      console.error('💥 Error message:', err.message);
+      console.error('💥 Error stack:', err.stack);
+      console.error('📊 ==========================================');
+      
       setError(err.message);
       Alert.alert('Error', 'No se pudieron cargar los datos');
     } finally {
       setLoading(false);
+      console.log('🏁 Fetch data completed');
     }
   };
 
   const handleRoutePress = (route) => {
+    console.log('🚌 ========== NAVEGANDO A LISTA DE ESTUDIANTES ==========');
+    console.log('📍 Ruta seleccionada:', route.id);
+    console.log('📛 Título:', route.title);
+    console.log('👥 Total estudiantes:', route.students?.length || 0);
+    console.log('🚦 Estado de ruta:', route.status);
+    
+    const routeWithDefaults = {
+      ...route,
+      students: route.students.map(student => ({
+        ...student,
+        attendance_status: student.attendance_status || 'pending'
+      }))
+    };
+    
+    console.log('✅ Navegando a StudentsList con datos:', JSON.stringify(routeWithDefaults, null, 2));
+    
     navigation.navigate('StudentsList', { 
-      route: {
-        ...route,
-        students: route.students.map(student => ({
-          ...student,
-          attendance_status: student.attendance_status || 'pending'
-        }))
-      }
+      route: routeWithDefaults
     });
   };
 
   const handleMapPress = (route) => {
+    console.log('🗺️ ========== NAVEGANDO AL MAPA ==========');
+    console.log('📍 Ruta para mapa:', route.id);
+    console.log('📛 Título:', route.title);
+    console.log('📍 Destino:', route.end_location);
+    
     navigation.navigate('Home', {
       destination: {
         latitude: route.end_location.latitude,
         longitude: route.end_location.longitude,
       },
       routeInfo: {
+        id: route.id,
         title: route.title,
         description: route.description,
         schedule: route.schedule,
+        status: route.status
       }
     });
+    
+    console.log('✅ Navegación al mapa iniciada');
   };
 
   const saveAttendanceChanges = async () => {
