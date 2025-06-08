@@ -12,6 +12,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URLS } from './config';
 
 const DataListScreen = () => {
   const [data, setData] = useState([]);
@@ -88,7 +89,7 @@ const DataListScreen = () => {
 
   const fetchData = async (token) => {
     try {
-      const response = await fetch('https://5fb7hk72-9000.use2.devtunnels.ms/api/users/data/', {
+      const response = await fetch(API_URLS.DATA, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -173,7 +174,7 @@ const DataListScreen = () => {
         return;
       }
 
-      const response = await fetch('https://5fb7hk72-9000.use2.devtunnels.ms/api/users/update-attendance/', {
+      const response = await fetch(API_URLS.UPDATE_ATTENDANCE, {
         method: 'POST',
         headers: {
           'Authorization': `Token ${token}`,

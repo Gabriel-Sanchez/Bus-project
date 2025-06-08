@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URLS } from './config';
 
 const LocationTracker = ({ routeId, currentLocation }) => {
   const [trackingInterval, setTrackingInterval] = useState(null);
@@ -24,7 +25,7 @@ const LocationTracker = ({ routeId, currentLocation }) => {
 
       console.log('Enviando ubicación:', JSON.stringify(locationData, null, 2));
 
-      const response = await fetch(`https://5fb7hk72-9000.use2.devtunnels.ms/api/users/routes/${routeId}/location/`, {
+      const response = await fetch(API_URLS.ROUTE_LOCATION(routeId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

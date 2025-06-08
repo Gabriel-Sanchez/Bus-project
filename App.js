@@ -16,6 +16,7 @@ import ContadorVelocidad from './componets/ContadorVelocidad';
 import LocationTracker from './LocationTracker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import { API_URLS } from './config';
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -57,7 +58,7 @@ function HomeScreen({ route, navigation }) {
         status: 'inactive'
       });
 
-      const response = await fetch(`https://5fb7hk72-9000.use2.devtunnels.ms/api/users/update-route-status/`, {
+      const response = await fetch(API_URLS.UPDATE_ROUTE_STATUS, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
