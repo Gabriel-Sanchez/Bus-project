@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URLS } from './config';
+const { API_URLS } = require('./config');
 
 const LocationTracker = ({ routeId, currentLocation }) => {
   const [trackingInterval, setTrackingInterval] = useState(null);

@@ -12,7 +12,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URLS } from './config';
+const { API_URLS } = require('./config');
 
 const DataListScreen = () => {
   const [data, setData] = useState([]);

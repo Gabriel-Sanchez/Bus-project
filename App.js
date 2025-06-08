@@ -16,7 +16,7 @@ import ContadorVelocidad from './componets/ContadorVelocidad';
 import LocationTracker from './LocationTracker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
-import { API_URLS } from './config';
+const { API_URLS } = require('./config');
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');

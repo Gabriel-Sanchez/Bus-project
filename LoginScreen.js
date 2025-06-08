@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URLS } from './config';
+const { API_URLS } = require('./config');
 
 const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
